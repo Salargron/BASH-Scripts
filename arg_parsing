@@ -1,0 +1,27 @@
+#!/bin/bash 
+#Exercise in parsing script arguments 
+declare -a args
+
+if [ "$#" -eq 0 ]; then
+    args=("-db=test1,test2,test3" "-df=test1.df,test2.df,test3.df")
+else
+    args=( "$@" )
+fi
+
+for arg in ${args[@]}; do
+    echo ${arg:0:3}
+
+    if [ "${arg:0:3}" = "-db" ]; then
+        dblist=$(echo ${arg#-db=} | \
+            awk -F, '{i=1; while ( i<=NF ) { print $i " "; i++ }}')
+    fi 
+
+    if [ "${arg:0:3}" = "-df" ]; then
+        dflist=$(echo ${arg#-df=} | \
+            awk -F, '{i=1; while ( i<=NF ) { print $i " "; i++ }}')
+    fi
+done
+
+echo $dblist
+echo $dflist
+

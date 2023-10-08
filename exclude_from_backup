@@ -1,0 +1,46 @@
+#!/bin/bash 
+#/usr/local/bin/exclude_from_backup
+#Show home directories that are excluded from backups and their overall size
+#
+#Backups were taking longer and getting too large, because developer home directories contained
+#large copies of code repositories and large test database files.
+#
+#I wrote this so that they could easily see what the daily backup script would be
+#excluding in case they needed to make separate backups of any ongoing work 
+#stored in those directories. 
+
+exclude_file=/log/exclude.M
+save_file=$exclude_file.$(date +%m%d)
+tmpfl=~/temp$$
+typeset -a dirlist
+
+startdir="/home"
+user=$(whoami)
+[ "$user" != "root" ] && startdir=$startdir/$user
+
+du -S $startdir > $tmpfl 2>/dev/null
+
+homedirs=$(find /home/* -maxdepth 0 -type d -exec echo {} \;)
+
+i=0
+while read line; do
+    sz=$(echo $line | awk '{print $1}')
+    dir=$(echo $line | awk '{print $2}')
+
+    if (( $sz > 102400 && ! $(echo $homedirs | grep -c $dir) )); then
+        dirlist[i]=$dir
+        let i++
+        total=$(($total + $sz))
+    fi
+done < "$tmpfl"
+
+rm -f $tmpfl
+
+total=0
+for (( j=0; j<${#dirlist[@]}; j++ )); do
+    du -hs ${dirlist[$j]}
+    x=$(du -s ${dirlist[$j]} | awk '{print $1}')
+    total=$(echo "$total + $x" | bc)
+done
+
+echo "Total excluded: $(echo "scale=1; $total/1024/1000" | bc)G"
