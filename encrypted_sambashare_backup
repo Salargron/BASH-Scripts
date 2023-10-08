@@ -1,0 +1,183 @@
+#!/bin/bash
+# rsync or complete copy of files from Samba shared folders to a backup drive.
+# This script will find the correct device using the disk UUIDs, and the 
+# Syncing and copying do not remove renamed directories or deleted files from
+# the backup drive without the -clean option.
+#
+# Usage: --backupdev=  Backup device name
+#        --mount=      Mount directory for backup device
+#        -clean        Delete all old backup files
+# Ex. encrypted_sambashare_backup --backupdev=/dev/sda1 --mount=/media/.....
+ 
+
+dirlist="<space-separated list of directories>"
+log="/log/backupshare.log"
+
+declare encrypted=false
+declare backupdev
+declare defaultmnt=/media/backupdr
+declare mapnm=""
+declare failed=0
+declare cleancopy=0
+declare sendemail=0
+declare fraddr=<...>
+declare toaddr=<...>
+declare ccaddr=<....>
+
+sendfailed ()
+{
+  tmpf=/tmp/backupshare.txt
+
+  [ $sendemail -eq 0 ] && exit 0
+
+  tail $log | awk 'sub("$", "\r")' > $tmpf
+
+  /usr/local/bin/sendemail -f $fraddr -t $toaddr -cc $ccadr \
+      -u "NAS backup failed." \
+      -m "From root on ...." -a $tmpf >/dev/null 2>&1 
+ 
+  rm -f $tmpf
+  exit 1
+}
+
+find_a_drive ()
+{
+  # Removable backup disk UUIDs or change this to use labels
+  uuid1=<UUID for disk 1>
+  uuid2=<UUID for disk 2>
+  uuid3=<UUID for disk 3>
+
+  declare -a drives
+
+  if [ "$backupdev" = "" ]; then
+      #Find the drives by UUID
+      drives=$(ls -l /dev/disk/by-uuid | grep -E "$uuid1|$uuid2|$uuid3" | \
+              awk '{print $11}')
+      #Use the first drive found if both are plugged in and running
+
+      if [ ${#drives[@]} != 0 ]; then
+          backupdev=/dev/$(basename ${drives[0]})
+      else
+          # There is no backup drive
+          echo "Backup drive not found. Exiting..." | tee -a $log
+          sendfailed 
+      fi 
+
+      unset drives
+  fi
+}
+
+unlock ()
+{
+  keyfile=<luks key file path>
+
+  # Is the drive encrypted with LUKS?
+  /sbin/cryptsetup isLuks $backupdev
+  if [ $? -eq 0 ]; then
+      echo "Unlocking encrypted drive..." | tee -a $log
+      /sbin/cryptsetup --key-file=$keyfile luksOpen $backupdev $mapnm
+      if [ $? -gt 0 ]; then
+          echo "Couldn't unlock ${1}. Quitting..." | tee -a $log
+          sendfailed
+      fi
+
+      #Assign new backup device
+      backupdev=/dev/mapper/$mapnm
+      encrypted=true
+  fi
+}
+
+mountusb ()
+{
+  ! [ -d $mnt ] && mkdir $mnt
+
+  echo "Mounting external hard drive..." | tee -a $log
+  mount -t auto $backupdev $mnt
+  if [ $? -gt 0 ]; then
+      echo "Mounting backup drive failed. Exiting..." | tee -a $log
+      sendfailed
+  fi
+}
+
+syncdir ()
+{
+    printf "$(date +%H:%M:%S) ${1}\n" | tee -a $log
+    nice rsync -Cavzpog /share/${1} $mnt
+    rtn=$?
+    if [ $rtn -ne 0 ]; then
+        printf "  Error $rtn syncrhronizing files!\n" | tee -a $log
+        failed=1
+    fi
+}
+
+copydir ()
+{
+    printf "$(date +%H:%M:%S) ${1}\n" | tee -a $log
+    nice cp -pR /share/${1} $mnt/
+}
+
+#MAIN
+for arg in $@; do
+    if [ "${arg:0:12}" = "--backupdev=" ]; then
+        backupdev=$(echo ${arg#--backupdev=} | \
+            awk -F, '{i=1; while ( i<=NF ) { print $i " "; i++}}')
+    elif [ "${arg:0:8}" = "--mount=" ]; then
+        mnt=$(echo ${arg#--mount=} | \
+            awk -F, '{i=1; while (i<=NF ) { print $i " "; i++}}')
+    elif [ "${arg:0:6}" = "-clean" ]; then
+        cleancopy=1
+    elif [ "$arg:0:6}" = "-email" ]; then
+        sendemail=1
+    elif [ "${arg}" = "-h" ]; then
+        printf "Usage: --backupdev=  Backup device name\n"
+        printf "       --mount=      Mount directory for backup device\n"
+        printf "       -clean       Delete all old backup files"
+        printf "Ex. backupshare --backupdev=/dev/sda1 --mount=/media/lacie2Tb"
+        exit
+    fi
+done
+
+[ "$mnt" = "" ] && mnt="$defaultmnt"
+mapnm=$(basename $mnt)
+
+printf "\n--------------------------------------------------------------\n" \
+	| tee -a $log
+printf "Backing up shared folders, $(date)\n\n" | tee -a $log
+
+# Is there a drive mounted?
+tmp=$(mount | grep -c $mnt)
+# If not
+if [ $tmp -eq 0 ]; then
+    # Get a drive if not specified on the command line
+    if [ "$backupdev" = "" ]; then 
+        find_a_drive
+    fi
+
+    # Unlock it if it's encrypted
+    unlock
+
+    # Mount it
+    mountusb
+fi
+
+#Remove all old files from the backup drive
+if [ $cleancopy -gt 0 ]; then
+    printf "Clearing the backup drive...\n" | tee -a $log
+    nice rm -rf $mnt/*
+fi
+
+# Sync the directories on the backup drive with those on the shared
+printf "Syncing...\n" | tee -a $log
+for dir in $dirlist; do
+    syncdir $dir
+done
+
+umount $mnt
+
+if $encrypted; then
+    /sbin/cryptsetup luksClose $mapnm
+fi
+
+printf "\nBackup finished at $(date +%H:%M:%S)\n\n" | tee -a $log
+
+[ $failed -gt 0 ] && sendfailed
