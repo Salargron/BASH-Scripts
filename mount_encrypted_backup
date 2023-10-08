@@ -1,0 +1,82 @@
+#!/bin/bash
+# Default mount directory: /media/backupdrive
+# Mount one of the backup hard drives which may or may not be encrypted with luks
+# Usage: mount_backup_drive <device> <mount directory>
+#        mount_backup_drive <mount directory>
+#
+# This is a script that an admin would run if anyone requested recovery for  
+# samba share files.  I wrote it to use backup drive UUIDs but labels would 
+# probably have been a better choice. 
+#
+uuid1=<......>
+uuid2=<......>
+uuid3=<......>
+backupdev=""
+mnt=""
+lukskey=<path to luks key file>
+
+if [[ $# > 2 ]] || [[ $# -eq 0 ]] || [[ "${1}" = "-h" ]]; then
+    printf "Usage: mount_backup_drive <device> <mount directory>\n"
+    printf "       mount_backup_drive <mount directory>.\n"  
+    exit 0
+fi
+
+if [[ $# = 1 ]]; then
+    mnt="${1}"
+
+    declare -a drives
+    drives=$(ls -l /dev/disk/by-uuid | grep -E "$uuid1|$uuid2|$uuid3" | \
+             awk '{print $11}')
+    backupdev=/dev/$(basename ${drives[0]})
+    unset drives
+
+    if [[ "$backupdev" = "" ]]; then
+        echo "Error: Backup drive not found. Try specifying the device."
+        echo "List /dev/disk/by-uuid, and look for one of the three uuid numbers"
+        echo "in this script."
+        exit 1
+    fi
+fi
+
+if [[ $# = 2 ]]; then
+    backupdev=${1}
+    mnt="${2}"
+
+    if ! [[ "$backupdev" != "" && -e "$backupdev" ]]; then
+        echo Error: Device $backupdev does not exit
+        exit 1
+    fi
+fi
+
+if ! [[ -e "$mnt" && -d "$mnt" ]]; then
+    echo Mount directory $mnt does not exist.
+    printf "Create it? (y/n): "
+    read ans
+    if [[ "$ans" = "y" ]]; then
+        mkdir "${2}"
+    else
+        exit 0
+    fi
+fi
+
+/sbin/cryptsetup isLuks $backupdev 2>/dev/null
+if [ $? -eq 0 ]; then
+    mapnm=$(basename $backupdev)
+
+    echo "Unlocking encrypted drive..." | tee -a $log
+    /sbin/cryptsetup --key-file="$lukskey" luksOpen $backupdev $mapnm
+    # Quit if opening failed
+    ! [ -e /dev/mapper/$mapnm ] && exit 1
+
+    backupdev=/dev/mapper/$mapnm
+fi
+
+echo Mounting external hard drive to $mnt....
+mount -t ext3 $backupdev "$mnt" 
+mntstat=$?
+
+echo "When finished run..."
+echo "    sudo umount $mnt"
+echo "    sudo /sbin/cryptsetup luksClose $mapnm"
+# Exit with mount exit status
+exit $mntstat
