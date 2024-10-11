@@ -7,11 +7,11 @@
 # This is a script that an admin would run if anyone requested recovery for  
 # samba share files.
 
-label1=NASbackup1
-label2=NASbackup2
-label3=NASbackup3
+label1=NSbackup1
+label2=NSbackup2
+label3=NSbackup3
 backupdev=""
-mnt=""
+mnt="/media/backupdrive"
 lukskey=<path to luks key file>
 
 if [[ $# > 2 ]] || [[ $# -eq 0 ]] || [[ "${1}" = "-h" ]]; then
