@@ -5,12 +5,11 @@
 #        mount_backup_drive <mount directory>
 #
 # This is a script that an admin would run if anyone requested recovery for  
-# samba share files.  I wrote it to use backup drive UUIDs but labels would 
-# probably have been a better choice. 
-#
-uuid1=<......>
-uuid2=<......>
-uuid3=<......>
+# samba share files.
+
+label1=NASbackup1
+label2=NASbackup2
+label3=NASbackup3
 backupdev=""
 mnt=""
 lukskey=<path to luks key file>
@@ -25,15 +24,14 @@ if [[ $# = 1 ]]; then
     mnt="${1}"
 
     declare -a drives
-    drives=$(ls -l /dev/disk/by-uuid | grep -E "$uuid1|$uuid2|$uuid3" | \
+    drives=$(ls -l /dev/disk/by-label | grep -E "$label1|$label2|$label3" | \
              awk '{print $11}')
     backupdev=/dev/$(basename ${drives[0]})
     unset drives
 
     if [[ "$backupdev" = "" ]]; then
-        echo "Error: Backup drive not found. Try specifying the device."
-        echo "List /dev/disk/by-uuid, and look for one of the three uuid numbers"
-        echo "in this script."
+        echo Error: Backup drive not found. Try specifying the device.
+        echo (ls -l /dev/disk/by-label)
         exit 1
     fi
 fi
@@ -43,7 +41,7 @@ if [[ $# = 2 ]]; then
     mnt="${2}"
 
     if ! [[ "$backupdev" != "" && -e "$backupdev" ]]; then
-        echo Error: Device $backupdev does not exit
+        echo Error: Device $backupdev does not exist
         exit 1
     fi
 fi
@@ -78,5 +76,6 @@ mntstat=$?
 echo "When finished run..."
 echo "    sudo umount $mnt"
 echo "    sudo /sbin/cryptsetup luksClose $mapnm"
+
 # Exit with mount exit status
 exit $mntstat
