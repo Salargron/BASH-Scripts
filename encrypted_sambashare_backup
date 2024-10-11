@@ -7,7 +7,6 @@
 # Usage: --backupdev=  Backup device name
 #        --mount=      Mount directory for backup device
 #        -clean        Delete all old backup files
-# Ex. encrypted_sambashare_backup --backupdev=/dev/sda1 --mount=/media/.....
  
 
 dirlist="<space-separated list of directories>"
@@ -42,19 +41,19 @@ sendfailed ()
 
 find_a_drive ()
 {
-  # Removable backup disk UUIDs or change this to use labels
-  uuid1=<UUID for disk 1>
-  uuid2=<UUID for disk 2>
-  uuid3=<UUID for disk 3>
+  # Removable backup disk labels
+  label1=NASbackup1
+  label2=NASbackup2
+  label3=NASbackup3
 
   declare -a drives
 
   if [ "$backupdev" = "" ]; then
-      #Find the drives by UUID
-      drives=$(ls -l /dev/disk/by-uuid | grep -E "$uuid1|$uuid2|$uuid3" | \
+      #Find the drives by label
+      drives=$(ls -l /dev/disk/by-label | grep -E "$label1|$label2|$label3" | \
               awk '{print $11}')
-      #Use the first drive found if both are plugged in and running
 
+      #Use the first drive found if both are plugged in and running
       if [ ${#drives[@]} != 0 ]; then
           backupdev=/dev/$(basename ${drives[0]})
       else
@@ -116,7 +115,8 @@ copydir ()
     nice cp -pR /share/${1} $mnt/
 }
 
-#MAIN
+########################## MAIN ###############################
+
 for arg in $@; do
     if [ "${arg:0:12}" = "--backupdev=" ]; then
         backupdev=$(echo ${arg#--backupdev=} | \
