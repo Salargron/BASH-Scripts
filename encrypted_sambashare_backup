@@ -1,8 +1,8 @@
 #!/bin/bash
 # rsync or complete copy of files from Samba shared folders to a backup drive.
-# This script will find the correct device using the disk UUIDs, and the 
-# Syncing and copying do not remove renamed directories or deleted files from
-# the backup drive without the -clean option.
+# This script will find the backup drive device if isn't specified. Files in 
+# user shares that were deleted or renamed will remain on the backup until
+# the -clean option is used.
 #
 # Usage: --backupdev=  Backup device name
 #        --mount=      Mount directory for backup device
