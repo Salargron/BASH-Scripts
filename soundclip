@@ -1,0 +1,131 @@
+#!/bin/bash
+# soundclip 
+# Heavily modified version of music.sh by Antonio Macchi
+
+#  devfl default = 8000 frames per second, 8 bits per frame (1 byte),
+#+ 1 channel (mono)
+
+duration=2000       # If 8000 bytes = 1 second, then 2000 = 1/4 second.
+volume=$'\xc0'      # Max volume = \xff (or \x00).
+mute=$'\x80'        # No volume = \x80 (the middle).
+
+function mknote ()  # $1=Note Hz in bytes (e.g. A = 440Hz ::
+{                   #+ 8000 fps / 440 = 16 :: A = 16 bytes per second)
+  for t in `seq 0 $duration`
+  do
+    test $(( $t % $1 )) = 0 && echo -n $volume || echo -n $mute
+  done
+}
+
+function bonny () {
+    duration=2000
+    e=`mknote 49`
+    g=`mknote 41`
+    a=`mknote 36`
+    b=`mknote 32`
+    c=`mknote 30`
+    cis=`mknote 29`
+    d=`mknote 27`
+    e2=`mknote 24`
+    n=`mknote 32767`
+
+    musicstr="$g$e2$d$c$d$c$a$g$n$g$e$n$g$e2$d$c$c$b$c$cis$n$cis$d$n"
+}
+
+function duhduh () {
+    musicstr=""
+    temp1=/tmp/soundclip1$$
+    temp2=/tmp/soundclip2$$
+    temp3=/tmp/soundclip3$$
+    duration=2500
+    assign_notes
+    str1="$b$n$g$n$cs$cs$cs$cs$cs"
+    str2="$b$n$g$n$g$g$g$g$g"
+    str3="$b$n$g$n$as$as$as$as$as"
+    echo $str1 > $temp1 
+    echo $str2 > $temp2
+    echo $str3 > $temp3
+
+    aplay $temp1 >/dev/null 2>&1 & 
+    aplay $temp2 >/dev/null 2>&1 & 
+    aplay $temp3 > /dev/null 2>&1
+    rm $temp1 $temp2 $temp3
+}
+
+function aobtd () {
+    duration=1500
+    assign_notes
+    str1="$g$n$g$n$g$n$n$n$g$g$as$g$c$n$n$n"
+    str2="$g$n$g$n$g$n$n$n$d$d$d$d$c" 
+    musicstr="$str1$str2"
+}
+
+function cars () {
+    duration=2000
+    assign_notes
+    str1="$f2$e2$as$c$n$g$g$g" 
+    str2="$f2$e2$g2$n$e2$n$c$n$d$as$n"
+    str3="$n$n$n$n$g$d$as$n"
+    musicstr=$str1$str1$str1$str2$str3
+}
+
+function arpeggio () {
+    duration=1500
+    assign_notes
+    arpeg1="$e$gs$b$e2$b$gs$e$e"
+    arpeg2="$f$a$c$f2$c$a$f$f"
+    arpeg3="$g$b$d$g2$d$b$g$g"
+    musicstr="$arpeg1$arpeg2$arpeg3"
+}
+
+function scales () {
+    duration=2000
+    assign_notes
+    fstr="$f$g$a$as$c$d$e2$f2"
+    estr="$e$fs$gs$a$b$cs$ds$e2"
+    gstr="$g$a$b$c$d$e2$f2s$g2"
+    astr="$a$b$cs$d$e2$f2s$g2s$a2"
+    musicstr="$estr$fstr$gstr$astr"
+}
+
+function assign_notes () {
+    d1=`mknote 54` 
+    e=`mknote 52` 
+    f=`mknote 50`   
+    fs=`mknote 47`
+    g=`mknote 44`
+    gs=`mknote 42`
+    a=`mknote 39`
+    as=`mknote 37`
+    b=`mknote 35`
+    c=`mknote 33`
+    cs=`mknote 31` 
+    d=`mknote 29`
+    ds=`mknote 27`
+    e2=`mknote 26` 
+    f2=`mknote 25`
+    f2s=`mknote 23`
+    g2=`mknote 22`
+    g2s=`mknote 21`
+    a2=`mknote 19` 
+    n=`mknote 32767`
+}
+
+musicstr=""
+
+case "${1}" in
+    bonny ) bonny;;
+    aobtd ) aobtd;;
+    duhduh ) duhduh;;
+    arpeg ) arpeggio;;
+    scales ) scales;;
+    cars ) cars;;
+    * ) musicstr="";;
+esac
+
+if [ $musicstr ]; then
+    echo -n $musicstr > /tmp/soundclip$$
+    aplay /tmp/soundclip$$ > /dev/null 2>&1
+    rm /tmp/soundclip$$
+fi
+exit 0

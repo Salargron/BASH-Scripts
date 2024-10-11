@@ -1,0 +1,170 @@
+#!/bin/bash
+# Syntax lessons:
+# Values by themselves will always test true in a [ ] construct not matter their type.  Bool values can be used alone in an if statement when not enclosed in a test construct.  && and || should be used instead of -a and -o when using a bool value in a compound condition.
+
+# Don't clear if only displaying help.
+trap 'tput clear; exit' 1 INT
+
+declare -i cdtime
+
+termsize=($(stty size))
+rows=${termsize[0]}
+cols=${termsize[1]}
+
+mclip="arpeg"
+
+function printhelp () {
+    echo "Usage: ${0} [OPTION] [H] [M] S"
+    echo "       -m=[Music clip] (from the soundclip script, default arpeg)"
+    echo "       -h Print help"
+}
+
+function get_pos () {
+# taken from Stackexchange
+# cpos[0] is current row
+# cpos[1] is current column
+
+    local v=() t=$(stty -g)
+    stty -echo
+    tput u7
+    IFS='[;' read -rd R -a v
+    stty $t
+    cpos=(${v[@]:1})
+    c_row=${cpos[0]}
+    c_col=${cpos[1]}
+}
+
+function goto_center () {
+    centerline=$(($rows/2))
+    tput cup $centerline 0 
+}
+
+function make_room () {
+    get_pos
+
+    i=$((rows - $c_row))
+    if [ $i -lt $1 ]; then
+        for (( j=0; $j<$1; j++ )); do
+            printf '\n'
+        done
+        c_row=$(($rows - $1))
+    fi
+} 
+
+function input_char () {
+    while (true); do
+        tput cup $1 $2
+        read -s -N1 ichar
+        if [[ "$ichar" == ${3} ]]; then
+            printf "$ichar"
+            break
+        elif [ "$ichar" == "" ]; then
+            return 1
+        fi 
+    done
+}
+
+function isallnum () {
+    for (( i=0; i<${#1}; i++ )); do        
+        ! [[ "${1:$i:1}" == [0-9] ]] && return 1
+    done
+    return 0
+}
+
+function displaycd () {
+# displaycd <seconds> <
+    hrstr=$(($1 / 3600))
+    minstr=$((($1 % 3600) / 60))
+    secstr=$(($1 % 60))
+
+    [ $hrstr -lt 10 ] && hrstr=0$hrstr
+    [ $minstr -lt 10 ] && minstr=0$minstr
+    [ $secstr -lt 10 ] && secstr=0$secstr
+    
+    if [ $cdtime -lt 60 ]; then
+        printf "%2s" $secstr
+    elif [ $cdtime -lt 3600 ]; then
+        printf "%2s:%2s" $minstr $secstr
+    elif [ $cdtime -ge 3600 ]; then
+        printf "%2s:%2s:%2s" $hrstr $minstr $secstr
+    fi 
+}
+
+function print_bottom () {
+    bottomline=$((rows - 1)) #Not sure why 
+    tput sc
+    tput cup $bottomline 1 
+    printf "$*"
+    tput rc
+}
+
+function check_arguments () {
+    declare -a time_args
+    arridx=0
+
+    for arg in $*; do
+        case "${arg:0:2}" in
+            -h) printhelp
+                exit 0;;
+            -m) mclip="${arg:3}";;
+             *) if isallnum $arg; then
+                    time_args[arridx]=$arg
+                    let "arridx+=1"
+                fi;;
+        esac
+    done
+
+    case ${#time_args[@]} in
+         0) cdtime=0;;
+         1) cdtime=${time_args[0]};;
+         2) cdtime=$(((${time_args[0]}*60) + ${time_args[1]}));;
+         *) cdtime=$(((${time_args[0]}*3600) + (${time_args[1]}*60) \
+                     + ${time_args[2]}));;
+    esac
+}
+
+#****************************************************************
+
+
+check_arguments $*
+
+get_pos
+
+if [ $cdtime -eq 0 ]; then
+    printhelp
+    exit 0
+fi
+
+make_room 3
+
+starttime=$(date +%s)
+endtime=$(( $starttime + $cdtime ))
+remtime=$cdtime
+currtime=$starttime
+
+#make_room 3 
+
+tput cup $c_row 0
+echo " $(displaycd $cdtime) started at $(date -d@$starttime +%H:%M:%S)"
+    
+tput sc
+tput civis
+
+while [ $currtime -lt $endtime ]; do
+    tput rc
+    printf " $(displaycd $remtime)"
+
+    sleep 1
+    currtime=$(date +%s)
+    remtime=$(($endtime - $currtime))
+
+    [ $remtime -lt 0 -o $currtime -ge $endtime ] && remtime=0
+done
+
+tput cnorm
+tput rc
+printf " $(displaycd 0) finished at $(date -d@$endtime +%H:%M:%S)\n"
+
+soundclip $mclip &    
+
+exit 0

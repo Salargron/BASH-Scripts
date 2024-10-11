@@ -1,0 +1,41 @@
+#!/bin/bash
+
+#tput reset
+ 
+echo
+echo "Given the principal, interest rate, and term of a mortgage,"
+echo "calculate the monthly payment."
+
+bottom=1.0
+
+echo
+echo -n "Enter principlal (no commas) "
+read principal
+echo -n "Enter interest rate (percent) "
+read interest_r
+echo -n "Enter term (months) "
+read term
+
+# Convert % to decimal
+interest_r=$(echo "scale=9; $interest_r/100.0" | bc)
+
+# Monthly increase in principal
+interest_rate=$(echo "scale=9; $interest_r/12 + 1.0" | bc)
+
+top=$(echo "scale=9; $principal*$interest_rate^$term" | bc)
+
+bottom=`{
+    echo "scale=9; bottom=$bottom; interest_rate=$interest_rate"
+    for (( x=1; x<=$term; x++ ))
+    do
+        echo 'bottom = bottom * interest_rate + 1'
+    done
+    echo 'bottom'
+    } | bc`
+
+payment=$(echo "scale=2; $top/$bottom" | bc)
+
+echo "monthly payment = \$$payment"
+echo
+
+exit 0
