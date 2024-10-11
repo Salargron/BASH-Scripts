@@ -1,6 +1,6 @@
 #!/bin/bash
 # Cancel print jobs through a menu selection 
-# I wrote this to give non-admin users a easy way to delete large queued print jobs.
+# I wrote this to give non-admin users an easy way to delete large queued print jobs.
 
 ###### Trap Ctrl-C not to allow users to exit #################################
 trap ' ' 2 15
