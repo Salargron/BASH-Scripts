@@ -1,13 +1,12 @@
 #!/bin/bash
-# rsync or complete copy of files from Samba shared folders to a backup drive.
-# This script will find the backup drive device if isn't specified. Files in 
-# user shares that were deleted or renamed will remain on the backup until
+# rsync or complete copy of files from Samba shared directories to a backup drive.
+# This script will find the backup drive device if it isn't specified. Files in 
+# users' shares that were deleted or renamed will remain on the backup until
 # the -clean option is used.
 #
 # Usage: --backupdev=  Backup device name
 #        --mount=      Mount directory for backup device
 #        -clean        Delete all old backup files
- 
 
 dirlist="<space-separated list of directories>"
 log="/log/backupshare.log"
@@ -32,7 +31,7 @@ sendfailed ()
   tail $log | awk 'sub("$", "\r")' > $tmpf
 
   /usr/local/bin/sendemail -f $fraddr -t $toaddr -cc $ccadr \
-      -u "NAS backup failed." \
+      -u "User network storage backup failed." \
       -m "From root on ...." -a $tmpf >/dev/null 2>&1 
  
   rm -f $tmpf
@@ -42,9 +41,9 @@ sendfailed ()
 find_a_drive ()
 {
   # Removable backup disk labels
-  label1=NASbackup1
-  label2=NASbackup2
-  label3=NASbackup3
+  label1=NSbackup1
+  label2=NSbackup2
+  label3=NSbackup3
 
   declare -a drives
 
