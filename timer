@@ -1,6 +1,10 @@
 #!/bin/bash
-# Syntax lessons:
-# Values by themselves will always test true in a [ ] construct not matter their type.  Bool values can be used alone in an if statement when not enclosed in a test construct.  && and || should be used instead of -a and -o when using a bool value in a compound condition.
+# Uses the soundclip script to generate the alarm
+# Ex. timer 5 0
+#     to start a 5 min timer for your yerba mate brew.
+# Ex. timer 5 0 -m=cars
+#     to start a 5 min timer that finishes with a few mangled bars of 
+#     Gary Numen's classic single Cars
 
 # Don't clear if only displaying help.
 trap 'tput clear; exit' 1 INT
@@ -20,7 +24,7 @@ function printhelp () {
 }
 
 function get_pos () {
-# taken from Stackexchange
+# Taken from Stackexchange
 # cpos[0] is current row
 # cpos[1] is current column
 
@@ -72,7 +76,7 @@ function isallnum () {
 }
 
 function displaycd () {
-# displaycd <seconds> <
+# Display remaining time
     hrstr=$(($1 / 3600))
     minstr=$((($1 % 3600) / 60))
     secstr=$(($1 % 60))
